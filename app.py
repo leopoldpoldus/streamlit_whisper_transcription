@@ -55,3 +55,6 @@ if st.button("Transcribe"):
     # save transcript to text file
     with open("transcript.txt", "w") as f:
         f.write(text)
+
+    # download transcript
+    st.download_button('Download Transcript', text)
