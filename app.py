@@ -1,60 +1,91 @@
 import os
 import sys
 import datetime
-
-working_dir = os.path.dirname(os.path.abspath(__file__))
-sys.path.append(working_dir)
-
 import streamlit as st
 
 from audio_recorder_streamlit import audio_recorder
 from whisper_API import transcribe
 
 
-st.title("Whisper Transcription")
+def save_audio_file(audio_bytes, file_extension):
+    """
+    Save audio bytes to a file with the specified extension.
 
-# tab record audio and upload audio
-tab1, tab2 = st.tabs(["Record Audio", "Upload Audio"])
+    :param audio_bytes: Audio data in bytes
+    :param file_extension: The extension of the output audio file
+    :return: The name of the saved audio file
+    """
+    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    file_name = f"audio_{timestamp}.{file_extension}"
 
-with tab1:
-    audio_bytes = audio_recorder()
-    if audio_bytes:
-        st.audio(audio_bytes, format="audio/wav")
-        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    with open(file_name, "wb") as f:
+        f.write(audio_bytes)
 
-        # save audio file to mp3
-        with open(f"audio_{timestamp}.mp3", "wb") as f:
-            f.write(audio_bytes)
+    return file_name
 
-with tab2:
-    audio_file = st.file_uploader("Upload Audio", type=["mp3", "mp4", "wav", "m4a"])
 
-    if audio_file:
-        # st.audio(audio_file.read(), format={audio_file.type})
-        timestamp = timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-        # save audio file with correct extension
-        with open(f"audio_{timestamp}.{audio_file.type.split('/')[1]}", "wb") as f:
-            f.write(audio_file.read())
+def transcribe_audio(file_path):
+    """
+    Transcribe the audio file at the specified path.
 
-if st.button("Transcribe"):
-    # find newest audio file
-    audio_file_path = max(
-        [f for f in os.listdir(".") if f.startswith("audio")],
-        key=os.path.getctime,
-    )
+    :param file_path: The path of the audio file to transcribe
+    :return: The transcribed text
+    """
+    with open(file_path, "rb") as audio_file:
+        transcript = transcribe(audio_file)
 
-    # transcribe
-    audio_file = open(audio_file_path, "rb")
+    return transcript["text"]
 
-    transcript = transcribe(audio_file)
-    text = transcript["text"]
 
-    st.header("Transcript")
-    st.write(text)
+def main():
+    """
+    Main function to run the Whisper Transcription app.
+    """
+    st.title("Whisper Transcription")
 
-    # save transcript to text file
-    with open("transcript.txt", "w") as f:
-        f.write(text)
+    tab1, tab2 = st.tabs(["Record Audio", "Upload Audio"])
 
-    # download transcript
-    st.download_button('Download Transcript', text)
+    # Record Audio tab
+    with tab1:
+        audio_bytes = audio_recorder()
+        if audio_bytes:
+            st.audio(audio_bytes, format="audio/wav")
+            save_audio_file(audio_bytes, "mp3")
+
+    # Upload Audio tab
+    with tab2:
+        audio_file = st.file_uploader("Upload Audio", type=["mp3", "mp4", "wav", "m4a"])
+        if audio_file:
+            file_extension = audio_file.type.split('/')[1]
+            save_audio_file(audio_file.read(), file_extension)
+
+    # Transcribe button action
+    if st.button("Transcribe"):
+        # Find the newest audio file
+        audio_file_path = max(
+            [f for f in os.listdir(".") if f.startswith("audio")],
+            key=os.path.getctime,
+        )
+
+        # Transcribe the audio file
+        transcript_text = transcribe_audio(audio_file_path)
+
+        # Display the transcript
+        st.header("Transcript")
+        st.write(transcript_text)
+
+        # Save the transcript to a text file
+        with open("transcript.txt", "w") as f:
+            f.write(transcript_text)
+
+        # Provide a download button for the transcript
+        st.download_button("Download Transcript", transcript_text)
+
+
+if __name__ == "__main__":
+    # Set up the working directory
+    working_dir = os.path.dirname(os.path.abspath(__file__))
+    sys.path.append(working_dir)
+
+    # Run the main function
+    main()
